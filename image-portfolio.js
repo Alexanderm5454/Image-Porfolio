@@ -7,6 +7,7 @@
 
     function PortfolioItemList() {
         this.portfolioGalleries = {};
+        this.galleryTitles = {};
         this.portfolioItems = {};
         this.rootElmId = "images";
         this.pageTop = null;
@@ -16,21 +17,24 @@
         var pathItems = this.pathname.split("/");
         this.pathnameGallery = pathItems[0];
         this.pathnameImage = pathItems[1];
-        console.log("pathItems: ", pathItems);
+        console.log("this.pathnameImage: ", this.pathnameImage);
+        this.galleriesUrlRoot = "http://127.0.0.1:8000/portfolio/galleries/";
+        this.imageUrlRoot = "http://127.0.0.1:8000/portfolio/images/";
     }
+
 
     PortfolioItemList.prototype.getGalleries = function() {
         var self = this;
         $.ajax({
             type: "GET",
-            url: "http://127.0.0.1:8000/portfolio/galleries/",
+            url: this.galleriesUrlRoot,
             dataType: "json",
             cache: false,
             success: function(data) {
                 setPortfolioGalleries(data);
             },
             error: function(xhr, status, err) {
-                console.error("http://127.0.0.1:8000/portfolio/galleries/", status, err.toString());
+                console.error(self.galleriesUrlRoot, status, err.toString());
             }
         });
 
@@ -42,38 +46,52 @@
     };
 
     PortfolioItemList.prototype.showGalleries = function() {
+
         for (var i = 0, len=this.portfolioGalleries.length; i<len; i++) {
             var tempElm = document.createElement("div");
             $(tempElm).addClass("navItem col-md-2")
                 .attr("id", this.portfolioGalleries[i].fields.gallery_url)
                 .text(this.portfolioGalleries[i].fields.title);
             $("#navBar").append(tempElm);
+
+            this.galleryTitles[this.portfolioGalleries[i].fields.gallery_url] = this.portfolioGalleries[i].fields.title;
+
             tempElm = null;
         }
+        var self = this;
         $(".navItem").click(function() {
+            self.pageTop = 0;
             var id = $(this).attr("id");
+            var title = self.galleryTitles[id];
+            $("#title").text(title);
             window.location.hash = id;
         });
-
     };
+
 
     PortfolioItemList.prototype.getItems = function() {
         var self = this;
         $.ajax({
             type: "GET",
-            url: "http://127.0.0.1:8000/portfolio/images/"+this.pathnameGallery,
+            url: this.imageUrlRoot + this.pathnameGallery,
             dataType: "json",
             cache: false,
             success: function(data) {
                 setPortfolioItems(data);
             },
             error: function(xhr, status, err) {
-                console.error("http://127.0.0.1:8000/portfolio/images/"+self.pathnameGallery, status, err.toString());
+                console.error(this.imageUrlRoot + self.pathnameGallery, status, err.toString());
             }
         });
         function setPortfolioItems(data) {
             self.portfolioItems = data;
-            self.showItems();
+            if (!self.pathnameImage) {
+                self.showItems();
+            } else {
+                var tempPathnameImage = "#" + self.pathnameImage;
+                self.pathnameImage = null;
+                self.showFullImage(tempPathnameImage);
+            }
         }
     };
 
@@ -81,6 +99,12 @@
         console.log("this.hash: ", this.hash);
         var self = this;
         window.onhashchange = function() {
+            if (self.pageTop) {
+                console.log("self.pageTop: ", self.pageTop);
+                window.scrollTo(0, self.pageTop);
+            } else {
+                window.scrollTo(0, 0);
+            }
             self.pathname = window.location.hash;
             self.pathname = self.pathname.replace("#", "");
             var pathItems = self.pathname.split("/");
@@ -104,7 +128,6 @@
             } else {
                 self.showFullImage(self.hash);
             }
-
 
         }
     };
@@ -131,28 +154,23 @@
                 $("#" + this.rootElmId).append(tempRow);
             }
             $(".portfolioSmall").hide();
-            tempElm =
+            tempElm = null;
             tempImgElm = null;
         }
-        // window.location.hash = "";
 
 
         $(".portfolioSmall").fadeIn();
 
         var self = this;
         $(".portfolioSmall").click(function() {
+            self.pageTop = window.scrollY;
             self.showFullImage(this);
         });
-
-        if (this.pageTop) {
-            window.scrollTo(0, this.pageTop);
-        }
 
     };
 
     PortfolioItemList.prototype.showFullImage = function(img) {
         var self = this;
-            self.pageTop = window.scrollY;
 
         var imageIndex,
             imgId;
@@ -194,12 +212,12 @@
         $(".portfolioLarge").css({"opacity": 0});
         $(".portfolioLarge").animate({"opacity": 1}, 500);
 
-        tempElm =
-        largeImageElm =
+        tempElm = null;
+        largeImageElm = null;
         descriptionElm =  null;
 
         window.location.hash = this.hash;
-
+        window.scrollTo(0, 0);
         $(".portfolioLarge").click(function() {
             $(this).fadeOut(function() {
                 console.log("self.pathnameGallery: ", self.pathnameGallery);
