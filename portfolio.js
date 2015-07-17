@@ -1,7 +1,12 @@
+
 (function(window, document) {
 
     var portfolio = {
-        window_position: 0
+        window_position: 0,
+        number_per_row: 6,
+        additional_page_height: 1000,
+        portfolio_items: [{}],
+        lastStart: 0
     };
 
     var Galleries = React.createClass({
@@ -91,7 +96,9 @@
             };
         },
         onHashChange: function (id) {
+            portfolio.portfolio_items.length = 0;
             portfolio.window_position = 0;
+            portfolio.lastStart = 0;
             if (typeof id === "string") {
                 window.location.hash = "#" + id;
             } else {
@@ -131,7 +138,7 @@
         },
         render: function () {
             var self = this;
-            var main_images = this.state.main_images.map(function (image, key) {
+            var main_images = this.state.main_images.map(function(image, key) {
                 var img = "/static/" + image;
                 var boundOnHashChange = self.onHashChange.bind(this, self.state.galleries_urls[key]);
                 return (
@@ -164,7 +171,6 @@
             };
         },
         componentDidMount: function () {
-            console.log("this.state.position: ", this.state.position);
             if (!this.state.gallery) {
                 var hash = window.location.hash;
                 var pathname = hash.replace("#", "");
@@ -175,17 +181,34 @@
                 var pathnameGallery = this.state.gallery;
             }
 
-            this.state.itemCount = parseInt((this.state.position + 900) / 100, 10) + 3;
-            this.getItems(0, this.state.itemCount, pathnameGallery);
-            console.log("portfolio.window_position: ", portfolio.window_position);
-            $("body").height(portfolio.window_position + 1200);
+            this.state.itemCount = 12;
+            console.log("portfolio.portfolio_items.length: ", portfolio.portfolio_items.length + "  |  this.state.itemCount: ", this.state.itemCount);
+            if (portfolio.portfolio_items.length < this.state.itemCount) {
+                this.getItems(0, this.state.itemCount, pathnameGallery);
+            } else {
+                var img_thumbs = [""],
+                        img_full = [""],
+                        img_ids = [""];
+                for (var i = 0, len=portfolio.portfolio_items.length; i<len; i++) {
+                    img_thumbs[i] = portfolio.portfolio_items[i].fields.thumbnail_image;
+                    img_full[i] = portfolio.portfolio_items[i].fields.image;
+                    img_ids[i] = portfolio.portfolio_items[i].fields.item_id;
+                }
+                this.setState({
+                    images_thumbs: img_thumbs,
+                    images_full: img_full,
+                    image_ids: img_ids
+                });
+            }
+
+            $("body").height(portfolio.window_position + portfolio.additional_page_height);
             window.scrollTo(0, portfolio.window_position);
             this.getAdditionalItems(pathnameGallery);
 
             window.location.hash = "#" + pathnameGallery;
         },
 
-        getItems: function (start, end, gallery) {
+        getItems: function(start, end, gallery) {
             $.ajax({
                 method: "GET",
                 url: "http://127.0.0.1:8000/images/" + gallery,
@@ -193,15 +216,21 @@
                 data: {countStart: start, countEnd: end},
                 cache: false,
                 success: function (data) {
-                    var img_thumbs = data.map(function (data) {
-                        return data.fields.thumbnail_image;
-                    });
-                    var img_full = data.map(function (data) {
-                        return data.fields.image;
-                    });
-                    var img_ids = data.map(function (data) {
-                        return data.fields.item_id;
-                    });
+                    console.log("start: ", start + "  |  end: ", end);
+                    if (start === 0) {
+                        portfolio.portfolio_items = data;
+                    } else {
+                        portfolio.portfolio_items = portfolio.portfolio_items.concat(data);
+                    }
+                    var img_thumbs = [""],
+                        img_full = [""],
+                        img_ids = [""];
+                    for (var i = 0, len=portfolio.portfolio_items.length; i<len; i++) {
+                        img_thumbs[i] = portfolio.portfolio_items[i].fields.thumbnail_image;
+                        img_full[i] = portfolio.portfolio_items[i].fields.image;
+                        img_ids[i] = portfolio.portfolio_items[i].fields.item_id;
+                    }
+
                     this.setState({
                         images_thumbs: img_thumbs,
                         images_full: img_full,
@@ -216,16 +245,21 @@
 
         getAdditionalItems: function (gallery) {
             var self = this,
-                position = $(document).height() - 1500;
-            window.onscroll = function () {
+                start = 0,
+                position = 100;
 
+            window.onscroll = function () {
                 if (window.scrollY >= position) {
-                    position += 154;
-                    self.setState({position: position});
-                    self.state.itemCount += 3;
-                    console.log("self.state.itemCount: ", self.state.itemCount);
-                    self.getItems(0, self.state.itemCount, gallery);
-                    self.render();
+                    if (portfolio.lastStart < portfolio.portfolio_items.length) {
+                        position += 100;
+                        start = self.state.itemCount;
+                        if (portfolio.portfolio_items.length <= start && portfolio.lastStart < start) {
+                            self.state.itemCount += portfolio.number_per_row;
+                            portfolio.lastStart = start;
+                            self.getItems(start, self.state.itemCount, gallery);
+                        }
+                        self.render();
+                    }
                 }
             }
         },
@@ -239,27 +273,19 @@
             );
         },
         render: function () {
-            var self = this;
-            var images = this.state.images_thumbs.map(function (image, index) {
-                var src = "/static/" + image;
-                var bindFullImage = self.getFullImage.bind(self, index, self.state.image_ids[index]);
-                if (index % 3 === 0) {
-                    return (
-                        <div className="portfolioSmall col-lg-3">
-                            <img id={self.state.image_ids[index]} onClick={bindFullImage} src={src} />
-                        </div>
-                    );
-                } else {
-                    return (
-                        <div className="portfolioSmall col-lg-3 col-lg-offset-1">
-                            <img id={self.state.image_ids[index]} onClick={bindFullImage} src={src} />
-                        </div>
-                    );
-                }
-            });
+
+            var images = [<div></div>];
+            for (var index = 0, len=this.state.images_thumbs.length; index<len; index++) {
+                var src = "/static/" + this.state.images_thumbs[index];
+                var bindFullImage = this.getFullImage.bind(this, index, this.state.image_ids[index]);
+                images[index] = <div key={this.state.image_ids[index]} className="portfolioSmall col-md-3">
+                                    <img onClick={bindFullImage} src={src} />
+                                </div>;
+            }
+
             return (
-                <div class="image">
-                {images}
+                <div className="row">
+                    {images}
                 </div>
             );
         }
@@ -276,14 +302,13 @@
 
 
         componentDidMount: function () {
-
             var hash = window.location.hash;
             var pathname = hash.replace("#", "");
             var pathItems = pathname.split("/");
             var pathnameGallery = pathItems[0];
 
             window.location.hash = "#" + pathnameGallery + "/" + this.props.hash;
-            window.scrollTo(0, 100);
+            window.scrollTo(0, 130);
 
             if (!this.state.image) {
                 var self = this;
@@ -294,12 +319,14 @@
                     data: {countEnd: "all"},
                     cache: false,
                     success: function (data) {
-                        var images = data.map(function (data) {
-                            return data.fields.image;
-                        });
-                        var ids = data.map(function (data) {
-                            return data.fields.item_id;
-                        });
+                        console.log("data: ", data);
+                        var images = [],
+                            ids = [];
+                        for (var i = 0, len=data.length; i<len; i++) {
+                            images[i] = data[i].fields.image;
+                            ids[i] = data[i].fields.item_id;
+                        }
+
                         var index = ids.indexOf(self.props.hash);
 
                         self.setState({image: "/static/" + images[index]});
@@ -321,7 +348,7 @@
             return (
                 <div>
                     <div className="largeImageContainer">
-                        <img className="portfolioLarge col-md-9 col-md-offset-1" src={this.state.image} />
+                        <img ref="fullImage" className="portfolioLarge col-md-9 col-md-offset-1" src={this.state.image} />
                     </div>
                     <div id="backToGallery" className="col-md-4 col-md-offset-1"></div>
                 </div>
@@ -337,10 +364,6 @@
 
         backToGallery: function () {
             window.location.hash = "#" + this.state.gallery;
-            React.render(
-                <ImageThumbs gall={this.state.gallery} position={this.props.position} />,
-                document.getElementById("images")
-            );
         },
 
         render: function () {
