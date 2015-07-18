@@ -69,20 +69,21 @@
                 dataType: "json",
                 cache: false,
                 success: function (data) {
-                    var gall = data.map(function (data) {
-                        return data.fields.title;
-                    });
-                    var gall_url = data.map(function (data) {
-                        return data.fields.gallery_url;
-                    });
-                    var gall_main_img = data.map(function (data) {
-                        return data.fields.main_image;
-                    });
+                    var gall = [""],
+                        gall_url = [""],
+                        gall_main_img = [""];
+
+                    for (var i = 0, len=data.length; i<len; i++) {
+                        gall[i] = data[i].fields.title;
+                        gall_url[i] = data[i].fields.gallery_url;
+                        gall_main_img[i] = data[i].fields.main_image;
+                    }
                     this.setState({
                         galleries: gall,
                         galleries_urls: gall_url,
                         gallery_main_images: gall_main_img
                     });
+
                     this.setPage();
                 }.bind(this),
                 error: function (xhr, status, err) {
@@ -152,9 +153,7 @@
                 {main_images}
                 </div>
             );
-
         }
-
     });
 
 
@@ -182,7 +181,6 @@
             }
 
             this.state.itemCount = 12;
-            console.log("portfolio.portfolio_items.length: ", portfolio.portfolio_items.length + "  |  this.state.itemCount: ", this.state.itemCount);
             if (portfolio.portfolio_items.length < this.state.itemCount) {
                 this.getItems(0, this.state.itemCount, pathnameGallery);
             } else {
@@ -216,7 +214,7 @@
                 data: {countStart: start, countEnd: end},
                 cache: false,
                 success: function (data) {
-                    console.log("start: ", start + "  |  end: ", end);
+                  //  console.log("start: ", start + "  |  end: ", end);
                     if (start === 0) {
                         portfolio.portfolio_items = data;
                     } else {
@@ -253,8 +251,8 @@
                     if (portfolio.lastStart < portfolio.portfolio_items.length) {
                         position += 100;
                         start = self.state.itemCount;
+                        self.state.itemCount += portfolio.number_per_row;
                         if (portfolio.portfolio_items.length <= start && portfolio.lastStart < start) {
-                            self.state.itemCount += portfolio.number_per_row;
                             portfolio.lastStart = start;
                             self.getItems(start, self.state.itemCount, gallery);
                         }
@@ -274,10 +272,13 @@
         },
         render: function () {
 
-            var images = [<div></div>];
+            var images = [<div></div>],
+                src = "",
+                bindFullImage = (function(){});
+
             for (var index = 0, len=this.state.images_thumbs.length; index<len; index++) {
-                var src = "/static/" + this.state.images_thumbs[index];
-                var bindFullImage = this.getFullImage.bind(this, index, this.state.image_ids[index]);
+                src = "/static/" + this.state.images_thumbs[index];
+                bindFullImage = this.getFullImage.bind(this, index, this.state.image_ids[index]);
                 images[index] = <div key={this.state.image_ids[index]} className="portfolioSmall col-md-3">
                                     <img onClick={bindFullImage} src={src} />
                                 </div>;
