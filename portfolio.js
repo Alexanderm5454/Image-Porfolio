@@ -179,6 +179,7 @@
             };
         },
         componentDidMount: function () {
+            $(".imagesContainer").removeClass("noBorder");
             if (/* !this.state.gallery */ !this.props.gall) {
                 var hash = window.location.hash;
                 var pathname = hash.replace("#", "");
@@ -289,7 +290,7 @@
             for (var index = portfolio.images.length, len=this.state.images_thumbs.length; index<len; index++) {
                 src = "/static/" + this.state.images_thumbs[index];
                 bindFullImage = this.getFullImage.bind(this, index, this.state.image_ids[index]);
-                portfolio.images[index] = <div key={this.state.image_ids[index]} className="portfolioSmall col-md-3">
+                portfolio.images[index] = <div key={this.state.image_ids[index]} className="portfolioSmall col-lg-3">
                                               <img onClick={bindFullImage} src={src} />
                                           </div>;
             }
@@ -309,7 +310,7 @@
     var FullImage = React.createClass({
         getInitialState: function () {
             return {
-                image: this.props.fullImg,
+                image: this.props.fullImg || "",
                 images: [],
                 ids: [],
                 image_hash: this.props.hash,
@@ -318,42 +319,45 @@
             };
         },
 
-        getAllImages: function() {
+        getAllImages: function(start, end) {
             var self = this;
-                $.ajax({
-                    type: "GET",
-                    url: "http://127.0.0.1:8000/images/" + self.state.pathnameGallery,
-                    dataType: "json",
-                    data: {countEnd: "all"},
-                    cache: false,
-                    success: function (data) {
-                        console.log("data: ", data);
-                        self.state.images = [];
-                        self.state.ids = [];
-                        for (var i = 0, len=data.length; i<len; i++) {
-                            self.state.images[i] = data[i].fields.image;
-                            self.state.ids[i] = data[i].fields.item_id;
+            $.ajax({
+                type: "GET",
+                url: "http://127.0.0.1:8000/images/" + self.state.pathnameGallery,
+                dataType: "json",
+                data: {countStart: start,
+                    countEnd: end},
+                cache: false,
+                success: function (data) {
+                    console.log("data: ", data);
+                    if (data.length > 0) {
+                        for (var i = 0, len = data.length; i < len; i++) {
+                            self.state.images.push(data[i].fields.image);
+                            self.state.ids.push(data[i].fields.item_id);
                         }
-
                         console.log("self.props.hash: ", self.props.hash);
+                        console.log("self.state.index: ", self.state.index);
                         if (this.state.index === -1) {
                             if (self.props.hash) {
                                 self.setState({index: self.state.ids.indexOf(self.props.hash)});
                             }
-
                             else if (!self.props.hash && self.props.index) {
                                 self.setState({index: self.props.index});
                             }
                         }
-
                         console.log("self.state.index: ", self.state.index);
-                        self.setState({image: self.state.images[self.state.index]});
+                        self.setHashAndImage();
+                    } else {
+                        console.log("no data");
+                        self.state.index = 0;
+                        self.setHashAndImage();
+                    }
 
-                    }.bind(this),
-                    error: function (xhr, status, err) {
-                        console.error("http://127.0.0.1:8000/images/" + self.state.pathnameGallery, status, err.toString());
-                    }.bind(this)
-                });
+                }.bind(this),
+                error: function (xhr, status, err) {
+                    console.error("http://127.0.0.1:8000/images/" + self.state.pathnameGallery, status, err.toString());
+                }.bind(this)
+            });
         },
 
         renderDirectionalButtons: function() {
@@ -369,8 +373,24 @@
             );
         },
 
+        displayBackToGallery: function() {
+            var self = this;
+            setTimeout(function() {
+                var fullImageHeight = self.refs.fullImage.getDOMNode().offsetHeight;
+                console.log("fullImageHeight: ", fullImageHeight);
+                $("#backToGallery").css({"margin-top": fullImageHeight})
+                                   .show();
+            }, 150);
+        },
+
+        setHashAndImage: function() {
+            window.location.hash = "#" + this.state.pathnameGallery + "/" + this.state.ids[this.state.index];
+            this.setState({image: this.state.images[this.state.index]});
+        },
+
 
         componentDidMount: function () {
+            $(".imagesContainer").addClass("noBorder");
             var hash = window.location.hash,
                 pathname = hash.replace("#", ""),
                 pathItems = pathname.split("/");
@@ -379,14 +399,9 @@
             window.location.hash = "#" + this.state.pathnameGallery + "/" + this.props.hash;
             window.scrollTo(0, 160);
 
-            var height = $(window).height(),
-                width = $("#images").width() * .90;
 
-            $(".portfolioLarge").css({"max-width": width, "max-height": height - 100});
-
-            console.log("this.state.image: ", this.state.image);
             if (!this.state.image) {
-                this.getAllImages();
+                this.getAllImages(null, "all");
             } else {
               //  this.setState({image: this.props.image});
                 for (var i = 0, len=portfolio.portfolio_items.length; i<len; i++) {
@@ -399,6 +414,14 @@
                 <BackToGalleryButton gall={this.state.pathnameGallery} position={this.props.position} />,
                 document.getElementById("backToGallery")
             );
+
+             var height = $(window).height(),
+                width = $("#images").width() * .80;
+
+            $(".portfolioLarge").css({"max-width": width, "max-height": height - 150});
+            $(".largeImageContainer").css({"max-height": height});
+            $("#backToGallery").hide();
+            this.displayBackToGallery();
 
         },
 
@@ -416,18 +439,16 @@
             console.log("this.state.images["+this.state.index+"]: " + this.state.images[this.state.index]);
             if (!this.state.images[this.state.index]) {
                 if (this.state.index !== -1) {
-                    this.getAllImages();
-                    if (this.state.index > this.state.images.length - 1) {
-                        this.state.index = 0;
-                    }
+                    this.getAllImages(this.state.index, this.state.index + 1);
                 } else {
                     this.state.index = this.state.images.length - 1;
+                    this.setHashAndImage();
                 }
+            } else {
+                this.setHashAndImage();
             }
 
-            window.location.hash = "#" + this.state.pathnameGallery + "/" + this.state.ids[this.state.index];
-            this.setState({image: this.state.images[this.state.index]});
-
+            this.displayBackToGallery();
         },
 
 
@@ -437,8 +458,8 @@
                 previous = this.renderNextPreviousImage.bind(this, "previous");
             return (
                 <div>
-                    <div className="largeImageContainer">
-                        <img ref="fullImage" className="portfolioLarge" src={image} />
+                    <div ref="fullImage" className="largeImageContainer">
+                        <img className="portfolioLarge" src={image} />
                     </div>
                     <div id="backToGallery" className="col-md-4 col-md-offset-1"></div>
                     <div id="previousButton"><div onClick={previous} className="previous">Previous</div></div>
