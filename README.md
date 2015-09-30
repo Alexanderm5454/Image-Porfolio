@@ -1,2 +1,2 @@
 # Image-Porfolio
-A simple single page image portfolio written using reacjs.
+A simple single page image portfolio written using reactjs.
